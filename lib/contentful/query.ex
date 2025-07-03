@@ -157,6 +157,26 @@ defmodule Contentful.Query do
   end
 
   @doc """
+  adds the `links_to_entry` parameter to a query, allowing to filter entries by the entries they link to.
+
+  ## Example
+      alias Contentful.Delivery.Entries
+      Entries |> links_to_entry("foobar") |> fetch_all
+  """
+  @spec links_to_entry({Entries, list()}, String.t()) :: {Entries, list()}
+  def links_to_entry({Entries, parameters}, entry_id) do
+    {Entries, parameters |> Keyword.put(:links_to_entry, entry_id)}
+  end
+
+  def links_to_entry(Entries, entry_id) do
+    links_to_entry({Entries, []}, entry_id)
+  end
+
+  def links_to_entry(queryable, _entry_id) do
+    queryable
+  end
+
+  @doc """
   will __resolve__ a query chain by eagerly calling the API and resolving the response immediately
 
   ## Examples
