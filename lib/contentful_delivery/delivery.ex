@@ -144,7 +144,7 @@ defmodule Contentful.Delivery do
   """
   @spec client :: Tesla.Client.t()
   def client do
-    case Contentful.http_client do
+    case Contentful.http_client() do
       Tesla -> Tesla.client([])
       mod -> mod.client()
     end
