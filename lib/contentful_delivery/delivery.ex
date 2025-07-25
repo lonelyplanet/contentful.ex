@@ -171,7 +171,7 @@ defmodule Contentful.Delivery do
   def url(opts \\ []) do
     endpoint = Keyword.get(opts, :endpoint, Configuration.get(:endpoint))
 
-    "#{@protocol}://#{host_from_config(endpoint)}" |> IO.inspect()
+    "#{@protocol}://#{host_from_config(endpoint)}"
   end
 
   @doc """
