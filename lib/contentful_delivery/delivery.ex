@@ -167,22 +167,24 @@ defmodule Contentful.Delivery do
 
       "https://cdn.contentful.com" = url()
   """
-  @spec url() :: String.t()
-  def url do
-    "#{@protocol}://#{host_from_config()}"
+  @spec url(list()) :: String.t()
+  def url(opts \\ []) do
+    endpoint = Keyword.get(opts, :endpoint, Configuration.get(:endpoint))
+
+    "#{@protocol}://#{host_from_config(endpoint)}" |> IO.inspect()
   end
 
   @doc """
   constructs the base url with the space id that got configured in config.exs
   """
-  @spec url(nil) :: String.t()
-  def url(space) when is_nil(space) do
+  @spec url(nil, list()) :: String.t()
+  def url(space, opts) when is_nil(space) do
     case space_from_config() do
       nil ->
-        url()
+        url(opts)
 
       space ->
-        space |> url
+        space |> url(opts)
     end
   end
 
@@ -192,9 +194,9 @@ defmodule Contentful.Delivery do
 
       "https://cdn.contentful.com/spaces/foo" = url("foo")
   """
-  @spec url(String.t()) :: String.t()
-  def url(space) do
-    [url(), "spaces", space] |> Enum.join(@separator)
+  @spec url(String.t(), list()) :: String.t()
+  def url(space, opts) do
+    [url(opts), "spaces", space] |> Enum.join(@separator)
   end
 
   @doc """
@@ -210,9 +212,9 @@ defmodule Contentful.Delivery do
     config :contentful_delivery, environment: "staging"
     "https://cdn.contentful.com/spaces/foo/environments/staging" = url("foo", nil)
   """
-  @spec url(String.t(), nil) :: String.t()
-  def url(space, env) when is_nil(env) do
-    [space |> url(), "environments", environment_from_config()]
+  @spec url(String.t(), nil, list()) :: String.t()
+  def url(space, env, opts) when is_nil(env) do
+    [space |> url(opts), "environments", environment_from_config()]
     |> Enum.join(@separator)
   end
 
@@ -223,8 +225,8 @@ defmodule Contentful.Delivery do
 
       "https://cdn.contentful.com/spaces/foo/environments/bar" = url("foo", "bar")
   """
-  def url(space, env) do
-    [space |> url(), "environments", env] |> Enum.join(@separator)
+  def url(space, env, opts) do
+    [space |> url(opts), "environments", env] |> Enum.join(@separator)
   end
 
   @doc """
@@ -308,10 +310,11 @@ defmodule Contentful.Delivery do
     Configuration.get(:space)
   end
 
-  defp host_from_config do
-    case Configuration.get(:endpoint) do
-      nil -> @endpoint
+  defp host_from_config(endpoint) do
+    case endpoint do
+      :delivery -> @endpoint
       :preview -> @preview_endpoint
+      nil -> @endpoint
       value -> value
     end
   end

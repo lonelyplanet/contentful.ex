@@ -214,7 +214,7 @@ defmodule Contentful.Query do
 
     url =
       [
-        space |> Delivery.url(env),
+        space |> Delivery.url(env, []),
         queryable.endpoint()
       ]
       |> Enum.join()
@@ -256,11 +256,12 @@ defmodule Contentful.Query do
         id \\ nil,
         space \\ Configuration.get(:space_id),
         env \\ Configuration.get(:environment),
-        api_key \\ Configuration.get(:access_token)
+        api_key \\ Configuration.get(:access_token),
+        opts \\ []
       )
 
-  def fetch_one(queryable, id, %Space{sys: %SysData{id: space_id}}, env, api_key) do
-    fetch_one(queryable, id, space_id, env, api_key)
+  def fetch_one(queryable, id, %Space{sys: %SysData{id: space_id}}, env, api_key, opts) do
+    fetch_one(queryable, id, space_id, env, api_key, opts)
   end
 
   def fetch_one(
@@ -268,25 +269,28 @@ defmodule Contentful.Query do
         id,
         space,
         env,
-        api_key
+        api_key,
+        opts
       ) do
+    endpoint = Keyword.get(opts, :endpoint, Configuration.get(:endpoint))
+
     url =
       case {queryable, id} do
         {Spaces, nil} ->
-          [space |> Delivery.url()]
+          [space |> Delivery.url(endpoint: endpoint)]
 
         {Spaces, id} ->
-          [id |> Delivery.url()]
+          [id |> Delivery.url(endpoint: endpoint)]
 
         {_queryable, nil} ->
           raise ArgumentError, "id is missing!"
 
         {{module, _parameters}, id} ->
           # drops the parameters, as single query responses don't allow parameters
-          [space |> Delivery.url(env), module.endpoint(), "/#{id}"]
+          [space |> Delivery.url(env, endpoint: endpoint), module.endpoint(), "/#{id}"]
 
         _ ->
-          [space |> Delivery.url(env), queryable.endpoint(), "/#{id}"]
+          [space |> Delivery.url(env, endpoint: endpoint), queryable.endpoint(), "/#{id}"]
       end
 
     # since you can pass compose into fetch one, we strip extra params here
