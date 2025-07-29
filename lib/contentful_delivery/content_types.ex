@@ -78,27 +78,8 @@ defmodule Contentful.Delivery.ContentTypes do
        name: name,
        description: description,
        display_field: display_field,
-       fields: Enum.map(fields, &build_field/1),
+       fields: Enum.map(fields, &ContentType.Field.new/1),
        sys: %SysData{revision: rev, updated_at: updated_at, created_at: created_at}
      }}
-  end
-
-  defp build_field(%{
-         "required" => req,
-         "name" => name,
-         "localized" => loc,
-         "disabled" => disabled,
-         "omitted" => omit,
-         "type" => type
-       }) do
-    %ContentType.Field{
-      required: req,
-      name: name,
-      localized: loc,
-      disabled: disabled,
-      omitted: omit,
-      type: type,
-      validations: []
-    }
   end
 end
