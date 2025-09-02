@@ -192,29 +192,31 @@ defmodule Contentful.Query do
         queryable,
         space \\ Configuration.get(:space_id),
         env \\ Configuration.get(:environment),
-        api_key \\ Configuration.get(:access_token)
+        api_key \\ Configuration.get(:access_token),
+        opts \\ []
       )
 
-  def fetch_all({Spaces, _}, _, _, _) do
+  def fetch_all({Spaces, _}, _, _, _, _) do
     {:error, [message: "Fetching a spaces collection is not supported, use fetch_one/1 instead"],
      total: 0}
   end
 
-  def fetch_all(queryable, %Space{sys: %SysData{id: space}}, env, api_key) do
-    fetch_all(queryable, space, env, api_key)
+  def fetch_all(queryable, %Space{sys: %SysData{id: space}}, env, api_key, opts) do
+    fetch_all(queryable, space, env, api_key, opts)
   end
 
   def fetch_all(
         {queryable, parameters},
         space,
         env,
-        api_key
+        api_key,
+        opts
       ) do
     params = parameters |> Request.collection_query_params()
 
     url =
       [
-        space |> Delivery.url(env, []),
+        space |> Delivery.url(env, opts),
         queryable.endpoint()
       ]
       |> Enum.join()
@@ -227,8 +229,8 @@ defmodule Contentful.Query do
     |> Delivery.parse_response(&queryable.resolve_collection_response/1)
   end
 
-  def fetch_all(queryable, space, env, api_key) do
-    fetch_all({queryable, []}, space, env, api_key)
+  def fetch_all(queryable, space, env, api_key, opts) do
+    fetch_all({queryable, []}, space, env, api_key, opts)
   end
 
   @doc """

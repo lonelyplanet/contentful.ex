@@ -110,14 +110,15 @@ defmodule Contentful.Delivery.Entries do
   """
   def resolve_entity_response(%{
         "fields" => fields,
-        "sys" => %{
-          "id" => id,
-          "revision" => rev,
-          "updatedAt" => updated_at,
-          "createdAt" => created_at,
-          "locale" => locale,
-          "contentType" => %{"sys" => %{"id" => content_type_id}}
-        },
+        "sys" =>
+          %{
+            "id" => id,
+            "revision" => rev,
+            "updatedAt" => updated_at,
+            "createdAt" => created_at,
+            "locale" => locale,
+            "contentType" => %{"sys" => %{"id" => content_type_id}}
+          } = sys,
         "metadata" => metadata
       }) do
     {:ok,
@@ -129,7 +130,10 @@ defmodule Contentful.Delivery.Entries do
          locale: locale,
          updated_at: updated_at,
          created_at: created_at,
-         content_type: %ContentType{id: content_type_id}
+         content_type: %ContentType{id: content_type_id},
+         first_published_at: sys["firstPublishedAt"],
+         published_at: sys["publishedAt"],
+         published_version: sys["publishedVersion"]
        },
        metadata: metadata
      }}

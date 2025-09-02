@@ -11,7 +11,10 @@ defmodule Contentful.SysData do
     :created_at,
     :updated_at,
     locale: nil,
-    content_type: nil
+    content_type: nil,
+    first_published_at: nil,
+    published_at: nil,
+    published_version: nil
   ]
 
   @type t :: %Contentful.SysData{
@@ -24,6 +27,9 @@ defmodule Contentful.SysData do
           # NOTE: locale string only exists in Entry and Asset
           locale: String | nil,
           # NOTE: ContentType only exists in Entry
-          content_type: String.t() | nil
+          content_type: String.t() | nil,
+          first_published_at: String.t() | nil,
+          published_at: String.t() | nil,
+          published_version: integer() | nil
         }
 end
