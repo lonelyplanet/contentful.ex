@@ -10,6 +10,8 @@ defmodule Contentful.SysData do
     :revision,
     :created_at,
     :updated_at,
+    :visibility,
+    :version,
     locale: nil,
     content_type: nil,
     first_published_at: nil,
@@ -21,6 +23,9 @@ defmodule Contentful.SysData do
           id: String.t(),
           # NOTE: revision only exists in Entry, Asset, ContentType
           revision: integer() | nil,
+          # NOTE: For Tags
+          version: integer() | nil,
+          visibility: String.t() | nil,
           # NOTE: timestamps only exists in Asset, Entry and ContentType
           created_at: String.t() | nil,
           updated_at: String.t() | nil,
