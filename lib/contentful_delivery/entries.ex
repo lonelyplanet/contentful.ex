@@ -113,10 +113,8 @@ defmodule Contentful.Delivery.Entries do
         "sys" =>
           %{
             "id" => id,
-            "revision" => rev,
             "updatedAt" => updated_at,
             "createdAt" => created_at,
-            "locale" => locale,
             "contentType" => %{"sys" => %{"id" => content_type_id}}
           } = sys,
         "metadata" => metadata
@@ -126,13 +124,14 @@ defmodule Contentful.Delivery.Entries do
        fields: fields,
        sys: %SysData{
          id: id,
-         revision: rev,
-         locale: locale,
+         revision: sys["revision"],
+         locale: sys["locale"],
          updated_at: updated_at,
          created_at: created_at,
          content_type: %ContentType{id: content_type_id},
          first_published_at: sys["firstPublishedAt"],
          published_at: sys["publishedAt"],
+         version: sys["version"],
          published_version: sys["publishedVersion"]
        },
        metadata: metadata
