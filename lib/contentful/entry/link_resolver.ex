@@ -20,28 +20,44 @@ defmodule Contentful.Entry.LinkResolver do
   """
   @spec replace_links_with_entities(Entry.t(), map()) :: Entry.t()
   def replace_links_with_entities(%Entry{} = entry, %{} = includes) do
-    replace_links_with_entities(entry, includes, MapSet.new())
+    Process.put(:contentful_resolved_cache, %{})
+    result = replace_links_with_entities(entry, includes, MapSet.new())
+    Process.delete(:contentful_resolved_cache)
+    result
   end
 
   def replace_links_with_entities(entity, _includes), do: entity
 
   defp replace_links_with_entities(%Entry{sys: %{id: entry_id}} = entry, %{} = includes, visited) do
-    if MapSet.member?(visited, entry_id) do
-      # Return the entry without processing links to break the cycle
-      entry
-    else
-      updated_visited = MapSet.put(visited, entry_id)
+    cache = Process.get(:contentful_resolved_cache, %{})
 
-      updated_fields =
-        entry.fields
-        |> Enum.reduce(%{}, fn {name, value}, fields_with_links_resolved ->
-          new_value =
-            resolve_links_in_field_with_nesting(value, includes, entry_id, updated_visited)
+    cond do
+      Map.has_key?(cache, entry_id) ->
+        Map.get(cache, entry_id)
 
-          Map.put(fields_with_links_resolved, name, new_value)
-        end)
+      MapSet.member?(visited, entry_id) ->
+        entry
 
-      struct(entry, fields: updated_fields)
+      true ->
+        updated_visited = MapSet.put(visited, entry_id)
+
+        updated_fields =
+          entry.fields
+          |> Enum.reduce(%{}, fn {name, value}, fields_with_links_resolved ->
+            new_value =
+              resolve_links_in_field_with_nesting(value, includes, entry_id, updated_visited)
+
+            Map.put(fields_with_links_resolved, name, new_value)
+          end)
+
+        resolved = struct(entry, fields: updated_fields)
+
+        Process.put(
+          :contentful_resolved_cache,
+          Map.put(Process.get(:contentful_resolved_cache, %{}), entry_id, resolved)
+        )
+
+        resolved
     end
   end
 

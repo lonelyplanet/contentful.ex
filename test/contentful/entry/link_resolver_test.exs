@@ -108,7 +108,8 @@ defmodule Contentful.Entry.LinkResolverTest do
               "createdAt" => "2019-03-22T08:33:44.329Z",
               "updatedAt" => "2020-04-18T18:44:10.435Z",
               "locale" => "en-US"
-            }
+            },
+            "metadata" => %{"tags" => []}
           }
         ]
       }
@@ -237,7 +238,8 @@ defmodule Contentful.Entry.LinkResolverTest do
               "createdAt" => "2019-03-22T08:33:44.329Z",
               "updatedAt" => "2020-04-18T18:44:10.435Z",
               "locale" => "en-US"
-            }
+            },
+            "metadata" => %{"tags" => []}
           }
         ],
         "Asset" => [
@@ -511,7 +513,8 @@ defmodule Contentful.Entry.LinkResolverTest do
               "revision" => 1,
               "type" => "Entry",
               "updatedAt" => "2024-04-27T13:55:14.757Z"
-            }
+            },
+            "metadata" => %{"tags" => []}
           },
           %{
             "fields" => %{
@@ -532,7 +535,8 @@ defmodule Contentful.Entry.LinkResolverTest do
               "revision" => 1,
               "type" => "Entry",
               "updatedAt" => "2024-04-27T13:51:11.254Z"
-            }
+            },
+            "metadata" => %{"tags" => []}
           },
           %{
             "fields" => %{
@@ -553,7 +557,8 @@ defmodule Contentful.Entry.LinkResolverTest do
               "revision" => 1,
               "type" => "Entry",
               "updatedAt" => "2024-04-27T13:50:40.939Z"
-            }
+            },
+            "metadata" => %{"tags" => []}
           }
         ]
       }
@@ -592,6 +597,157 @@ defmodule Contentful.Entry.LinkResolverTest do
           content_type: %ContentType{id: "page"}
         }
       } = LinkResolver.replace_links_with_entities(entry, includes)
+    end
+  end
+
+  describe "global resolution cache" do
+    defp make_entry_include(id, content_type_id, fields) do
+      %{
+        "fields" => fields,
+        "sys" => %{
+          "contentType" => %{
+            "sys" => %{"id" => content_type_id, "linkType" => "ContentType", "type" => "Link"}
+          },
+          "id" => id,
+          "type" => "Entry",
+          "revision" => 1,
+          "createdAt" => "2024-01-01T00:00:00.000Z",
+          "updatedAt" => "2024-01-01T00:00:00.000Z",
+          "locale" => "en-US"
+        },
+        "metadata" => %{"tags" => []}
+      }
+    end
+
+    defp make_link(id), do: %{"sys" => %{"id" => id, "linkType" => "Entry", "type" => "Link"}}
+
+    defp make_root_entry(id, content_type_id, fields) do
+      %Entry{
+        fields: fields,
+        sys: %SysData{
+          id: id,
+          revision: 1,
+          locale: "en-US",
+          updated_at: "2024-01-01T00:00:00.000Z",
+          created_at: "2024-01-01T00:00:00.000Z",
+          content_type: %ContentType{id: content_type_id}
+        }
+      }
+    end
+
+    test "caches resolved entries so the same entry is not re-resolved from a different branch" do
+      entry = make_root_entry("article", "article", %{
+        "pois" => [make_link("poi_a"), make_link("poi_b")]
+      })
+
+      includes = %{
+        "Entry" => [
+          make_entry_include("poi_a", "poi", %{
+            "name" => "POI A",
+            "place" => make_link("barcelona")
+          }),
+          make_entry_include("poi_b", "poi", %{
+            "name" => "POI B",
+            "place" => make_link("barcelona")
+          }),
+          make_entry_include("barcelona", "place", %{
+            "name" => "Barcelona",
+            "country" => "Spain"
+          })
+        ]
+      }
+
+      result = LinkResolver.replace_links_with_entities(entry, includes)
+
+      [resolved_a, resolved_b] = result.fields["pois"]
+
+      assert %Entry{fields: %{"name" => "Barcelona", "country" => "Spain"}} =
+               resolved_a.fields["place"]
+
+      assert %Entry{fields: %{"name" => "Barcelona", "country" => "Spain"}} =
+               resolved_b.fields["place"]
+
+      assert resolved_a.fields["place"] == resolved_b.fields["place"]
+    end
+
+    test "process dictionary cache is cleaned up after resolution" do
+      entry = make_root_entry("entry_1", "article", %{"title" => "Hello"})
+
+      LinkResolver.replace_links_with_entities(entry, %{})
+
+      assert Process.get(:contentful_resolved_cache) == nil
+    end
+
+    test "circular references between entries are handled without infinite recursion" do
+      entry = make_root_entry("article", "article", %{
+        "poi" => make_link("poi_a")
+      })
+
+      includes = %{
+        "Entry" => [
+          make_entry_include("poi_a", "poi", %{
+            "name" => "POI A",
+            "related" => make_link("poi_b")
+          }),
+          make_entry_include("poi_b", "poi", %{
+            "name" => "POI B",
+            "related" => make_link("poi_a")
+          })
+        ]
+      }
+
+      result = LinkResolver.replace_links_with_entities(entry, includes)
+
+      resolved_a = result.fields["poi"]
+      assert %Entry{fields: %{"name" => "POI A"}} = resolved_a
+
+      resolved_b = resolved_a.fields["related"]
+      assert %Entry{fields: %{"name" => "POI B"}} = resolved_b
+
+      # POI B's back-reference to POI A is returned as-is (cycle detection stops recursion),
+      # so its sub-fields are not recursively resolved
+      back_ref = resolved_b.fields["related"]
+      assert %Entry{fields: %{"name" => "POI A"}} = back_ref
+    end
+
+    test "many cross-linked entries resolve in bounded time (O(N) not O(N!))" do
+      n = 30
+      poi_ids = for i <- 1..n, do: "poi_#{i}"
+
+      poi_links = Enum.map(poi_ids, &make_link/1)
+
+      barcelona =
+        make_entry_include("barcelona", "place", %{
+          "name" => "Barcelona",
+          "pois" => poi_links
+        })
+
+      poi_includes =
+        Enum.map(poi_ids, fn id ->
+          make_entry_include(id, "poi", %{
+            "name" => "POI #{id}",
+            "place" => make_link("barcelona")
+          })
+        end)
+
+      includes = %{"Entry" => [barcelona | poi_includes]}
+
+      entry = make_root_entry("article", "article", %{"pois" => poi_links})
+
+      {time_us, result} =
+        :timer.tc(fn ->
+          LinkResolver.replace_links_with_entities(entry, includes)
+        end)
+
+      assert time_us < 1_000_000, "Expected < 1s, took #{time_us / 1_000}ms"
+
+      resolved_pois = result.fields["pois"]
+      assert length(resolved_pois) == n
+
+      for poi <- resolved_pois do
+        assert %Entry{} = poi
+        assert %Entry{fields: %{"name" => "Barcelona"}} = poi.fields["place"]
+      end
     end
   end
 end
